@@ -1,0 +1,41 @@
+# Settings for the MP124 pipeline. Code reads this file with yaml.safe_load.
+data:
+  train: data/raw/train.csv
+  later: data/raw/later.csv
+  holdout: data/raw/holdout_features.csv
+
+columns:
+  id: record_id
+  date: date
+  target: grain_kg
+  group: block               # the "office" column used for the unit check
+  numeric:
+    - cards_attached
+    - working_hours
+    - biometric_failures
+    - temp_c
+    - stock_kg_morning
+    - days_to_month_end
+  categorical:
+    - shop_area
+    - block
+
+checks:
+  # Numbers the handbook lists as typical "typed instead of blank" values.
+  sentinel_candidates: [-1, -99, -999, 999, 9999]
+  # Exact unit factors to test when one block looks off (km->m, years->months ...).
+  unit_factors: [10, 12, 60, 100, 1000]
+  # A group mean this many times bigger/smaller than the others counts as a unit mix-up.
+  unit_ratio_threshold: 5.0
+  # A value repeated on consecutive rows (sorted by date) spanning at least
+  # this many distinct days counts as a stuck sensor.
+  stuck_min_days: 7
+  # Target typos: in the sorted target, a jump where the next value is at least
+  # this many times the one below it (an extra zero makes values ~10x bigger).
+  typo_gap_ratio: 3.0
+  # A leaking column agrees with the target this closely (|correlation|).
+  leak_corr_threshold: 0.98
+
+reports:
+  findings_template: reports/findings.yaml
+  findings_out: reports/findings.yaml

@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Data CSVs are tracked by DVC: `dvc add` writes data/raw/.gitignore for train.csv and later.csv.
+
+# private viva prep
+VIVA_NOTES.md
