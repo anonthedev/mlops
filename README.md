@@ -16,7 +16,7 @@ SCSE3040 MLOps mini project.
 ## Status
 
 Stage 1 is done: repo layout, DVC tracking of `train.csv` and `later.csv`, the seven data checks in `src/`, and the `data_issues` part of `reports/findings.yaml`.
-Stages 2-4 (cleaning plus MLflow training, then the API, Docker, CI and Kubernetes, then drift monitoring, retraining and holdout predictions) are not built yet.
+The model workflow tracks three initial settings in MLflow, registers v1 and v2, and exports the registry champion with its holdout predictions.
 
 ## Layout (so far)
 
@@ -28,11 +28,17 @@ src/mp124/__init__.py
 src/mp124/config.py           loads params.yaml, file hashing, CSV loading
 src/mp124/checks.py           the seven data-problem checks (handbook section 7)
 src/mp124/find_issues.py      runs the checks, fills reports/findings.yaml
+src/mp124/model.py            preprocessing and model definitions
+src/mp124/train.py            training, experiment tracking, registry and holdout prediction
 data/raw/train.csv.dvc        DVC pointer (the CSV itself is not committed)
 data/raw/later.csv.dvc        DVC pointer
 data/raw/holdout_features.csv committed as is
 .dvc/config                   from `dvc init`
-reports/findings.yaml         the form from the zip; data_issues filled
+mlflow.db                     SQLite tracking and model registry
+mlartifacts/                  MLflow files for registered models
+models/model.joblib           champion pipeline for the prediction service
+predictions/holdout_predictions.csv
+reports/findings.yaml         data issues, tracking and model comparison
 docs/                         PROBLEM.md, GROUP.md, STUDENT_HANDBOOK.md from the zip
 ```
 
@@ -71,6 +77,29 @@ PYTHONPATH=src python -m mp124.find_issues --dry-run
 ```
 
 On Windows PowerShell, use `$env:PYTHONPATH="src"; python -m mp124.find_issues`.
+
+## Reproduce the MLflow runs
+
+After copying the original CSVs into `data/raw/`, run from the repository root:
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m mp124.train --output-dir .venv/mp124-reproduction
+```
+
+Use a fresh output directory for each reproduction. The command creates a new tracking
+database, logs the SHA-256 of the original `train.csv` in every run, and prints
+the tracking fields and promotion decision for the findings report.
+
+The last 20% of the deduplicated training rows by date select the v1 settings.
+The winning settings are refit on all deduplicated training rows. v2 adds the
+first 70% of `later.csv` by date and receives the `champion` alias only if
+its MAE on the remaining 30% improves by at least 10%.
+
+Open the committed experiment from the repository root with
+`mlflow ui --backend-store-uri sqlite:///mlflow.db`. The registered model is
+`mp124-grain-regressor`. The artifact paths are relative to the directory
+that contains the tracking database, so start MLflow from that directory.
 
 ## Stage 1 results (train.csv as given, 1038 rows)
 

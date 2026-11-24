@@ -38,10 +38,10 @@ data_issues:
     true_levels: 3         # how many real categories there are after cleaning
 
 tracking:
-  experiment_name: null
-  best_run_id: null        # the MLflow run id of your v1 model
-  registered_model_name: null
-  champion_version: null
+  experiment_name: "mp124-grain-distribution"
+  best_run_id: "2bd07705d10b41b2900b0cd33ba4d31a"  # the MLflow run id of your v1 model
+  registered_model_name: "mp124-grain-regressor"
+  champion_version: 2
 
 monitoring:
   psi:                     # cleaned train.csv vs later.csv, 10 bins
@@ -57,6 +57,6 @@ monitoring:
     'Block South': null
     'Block East': null
   worst_served_group: null
-  mae_v1_on_check: null    # v1 on the last 30% of later.csv (by date)
-  mae_v2_on_check: null    # v2 on the same rows
-  decision: null           # promote or keep
+  mae_v1_on_check: 167.75681205308504  # v1 on the last 30% of later.csv (by date)
+  mae_v2_on_check: 120.95644616630872  # v2 on the same rows
+  decision: promote                    # promote or keep

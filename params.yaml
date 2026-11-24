@@ -39,3 +39,23 @@ checks:
 reports:
   findings_template: reports/findings.yaml
   findings_out: reports/findings.yaml
+
+training:
+  experiment_name: mp124-grain-distribution
+  registered_model_name: mp124-grain-regressor
+  train_validation_fraction: 0.20
+  later_training_fraction: 0.70
+  minimum_mae_reduction: 0.10
+  random_state: 42
+  shop_area_levels: [rural, tribal, urban]
+  biometric_failures_sentinel: 9999
+  candidates:
+    - name: ridge
+      estimator: ridge
+      settings: {alpha: 1.0}
+    - name: boosting-shallow
+      estimator: histogram_gradient_boosting
+      settings: {max_iter: 100, max_leaf_nodes: 7, learning_rate: 0.08}
+    - name: boosting-deeper
+      estimator: histogram_gradient_boosting
+      settings: {max_iter: 140, max_leaf_nodes: 15, learning_rate: 0.05}

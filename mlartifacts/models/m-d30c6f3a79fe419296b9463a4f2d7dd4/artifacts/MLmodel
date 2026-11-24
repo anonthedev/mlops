@@ -1,0 +1,36 @@
+artifact_path: mlartifacts/models/m-d30c6f3a79fe419296b9463a4f2d7dd4/artifacts
+flavors:
+  python_function:
+    code: code
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.14.3
+  sklearn:
+    code: code
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+is_signature_from_type_hint: false
+mlflow_version: 3.18.0
+model_id: m-d30c6f3a79fe419296b9463a4f2d7dd4
+model_size_bytes: 32501
+model_uuid: m-d30c6f3a79fe419296b9463a4f2d7dd4
+prompts: null
+run_id: 9e47154c5b4c4a1b926b1e97e1b35a85
+signature:
+  inputs: '[{"type": "double", "name": "cards_attached", "required": true}, {"type":
+    "double", "name": "working_hours", "required": true}, {"type": "double", "name":
+    "biometric_failures", "required": true}, {"type": "double", "name": "temp_c",
+    "required": true}, {"type": "double", "name": "stock_kg_morning", "required":
+    true}, {"type": "double", "name": "days_to_month_end", "required": true}, {"type":
+    "string", "name": "shop_area", "required": true}, {"type": "string", "name": "block",
+    "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-11-24 13:10:43.475642'

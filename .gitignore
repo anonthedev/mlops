@@ -4,6 +4,12 @@ __pycache__/
 .venv/
 .pytest_cache/
 
+# SQLite tracking sidecars
+/mlflow.db-journal
+/mlflow.db-shm
+/mlflow.db-wal
+/mlruns/
+
 # Data CSVs are tracked by DVC: `dvc add` writes data/raw/.gitignore for train.csv and later.csv.
 
 # private viva prep
