@@ -45,18 +45,18 @@ tracking:
 
 monitoring:
   psi:                     # cleaned train.csv vs later.csv, 10 bins
-    cards_attached: null
-    working_hours: null
-    biometric_failures: null
-    temp_c: null
-    stock_kg_morning: null
-    days_to_month_end: null
-  most_drifted_feature: null
+    cards_attached: 5.496764
+    working_hours: 0.023525
+    biometric_failures: 0.021534
+    temp_c: 0.017695
+    stock_kg_morning: 0.081251
+    days_to_month_end: 0.055735
+  most_drifted_feature: "cards_attached"
   mae_by_group:            # v1 on later.csv, per value of block
-    'Block North': null
-    'Block South': null
-    'Block East': null
-  worst_served_group: null
+    'Block North': 96.341673
+    'Block South': 557.140678
+    'Block East': 106.155658
+  worst_served_group: "Block South"
   mae_v1_on_check: 167.75681205308504  # v1 on the last 30% of later.csv (by date)
   mae_v2_on_check: 120.95644616630872  # v2 on the same rows
   decision: promote                    # promote or keep
