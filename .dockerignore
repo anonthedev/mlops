@@ -1,0 +1,17 @@
+.git/
+.github/
+.dvc/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+data/
+docs/
+mlartifacts/
+mlflow.db
+mlflow.db-*
+mlruns/
+predictions/
+reports/
+tests/
+VIVA_NOTES.md

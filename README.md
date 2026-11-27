@@ -15,102 +15,94 @@ SCSE3040 MLOps mini project.
 
 ## Status
 
-Stage 1 is done: repo layout, DVC tracking of `train.csv` and `later.csv`, the seven data checks in `src/`, and the `data_issues` part of `reports/findings.yaml`.
-The model workflow tracks three initial settings in MLflow, registers v1 and v2, and exports the registry champion with its holdout predictions.
+All four stages are implemented and verified:
+1. **Stage 1 (Data & DVC):** Repository layout, DVC tracking for `train.csv` and `later.csv`, the seven data checks in `src/mp124/checks.py`, and `data_issues` in `reports/findings.yaml`.
+2. **Stage 2 (Training & MLflow):** Cleaning transformer and candidate models (`src/mp124/model.py`), chronological validation across 3 candidates logged to `mlflow.db`, and registered model `mp124-grain-regressor`.
+3. **Stage 3 (Service, Docker, CI, K8s & Logging):** FastAPI prediction service (`app/main.py`) with Pydantic boundary rules (`cards_attached <= 3500`, `biometric_failures >= 0`), structured stdout JSON logging (`app/logging_config.py`), `Dockerfile` + `.dockerignore`, GitHub Actions workflow (`.github/workflows/ci.yml`), Kubernetes manifests (`k8s/`), and pytest suite (`tests/`).
+4. **Stage 4 (Monitoring, Retraining, Holdout & Audit):** PSI per numeric column and per-block MAE (`src/mp124/monitor.py`), v2 retraining on cleaned `train.csv` + first 70% of `later.csv` (`src/mp124/train.py`), promotion check (27.9% MAE reduction -> `promote` v2 as `@champion`), `predictions/holdout_predictions.csv`, completed `reports/findings.yaml`, and end-to-end artifact verification (`src/mp124/verify.py`).
 
-## Layout (so far)
+## Layout
 
 ```
-README.md
-requirements.txt              pinned libraries
-params.yaml                   paths, column names, check thresholds (read by src/mp124/config.py)
-src/mp124/__init__.py
-src/mp124/config.py           loads params.yaml, file hashing, CSV loading
-src/mp124/checks.py           the seven data-problem checks (handbook section 7)
-src/mp124/find_issues.py      runs the checks, fills reports/findings.yaml
-src/mp124/model.py            preprocessing and model definitions
-src/mp124/train.py            training, experiment tracking, registry and holdout prediction
-data/raw/train.csv.dvc        DVC pointer (the CSV itself is not committed)
-data/raw/later.csv.dvc        DVC pointer
-data/raw/holdout_features.csv committed as is
-.dvc/config                   from `dvc init`
-mlflow.db                     SQLite tracking and model registry
-mlartifacts/                  MLflow files for registered models
-models/model.joblib           champion pipeline for the prediction service
+README.md                        project overview and run commands
+requirements.txt                 pinned Python dependencies
+params.yaml                      paths, columns, thresholds, training candidates
+Dockerfile                       python:3.12-slim API container (port 8000)
+.dockerignore                    container build exclusions
+.github/workflows/ci.yml         runs pytest on every push
+app/
+  __init__.py
+  logging_config.py              stdout JSON formatter for predictions
+  main.py                        FastAPI app: GET /health and POST /predict
+k8s/
+  deployment.yaml                Deployment mp124-api (2 replicas, probes on /health)
+  service.yaml                   Service mp124-svc (port 80 -> 8000)
+src/mp124/
+  __init__.py
+  config.py                      loads params.yaml, file hashing, CSV loading
+  checks.py                      the seven data-problem checks
+  find_issues.py                 populates data_issues in reports/findings.yaml
+  model.py                       feature cleaning and scikit-learn pipelines
+  train.py                       MLflow experiment tracking, registry v1/v2, holdout CSV
+  monitor.py                     PSI drift, per-block MAE, promotion helper
+  verify.py                      Stage 4 audit of findings, DVC, MLflow, model, holdout
+tests/
+  conftest.py                    adds src/ to sys.path for pytest
+  test_api.py                    FastAPI TestClient tests (health, bounds, JSON logs)
+  test_pipeline.py               cleaning, data checks, model fit, Stage 4 & K8s verification
+  test_stage4_monitoring.py      PSI, group MAE, chronological split, 10% promotion rule
+data/raw/
+  train.csv.dvc                  DVC pointer (CSV excluded from git)
+  later.csv.dvc                  DVC pointer (CSV excluded from git)
+  holdout_features.csv           holdout feature rows (250 records)
+.dvc/config                      DVC configuration
+mlflow.db                        SQLite tracking store and model registry
+mlartifacts/                     logged MLflow model artifacts
+models/model.joblib              exported @champion pipeline
 predictions/holdout_predictions.csv
-reports/findings.yaml         data issues, tracking and model comparison
-docs/                         PROBLEM.md, GROUP.md, STUDENT_HANDBOOK.md from the zip
+reports/findings.yaml            completed findings form
+docs/                            PROBLEM.md, GROUP.md, STUDENT_HANDBOOK.md
 ```
 
-## Put it on GitHub (Stage 1 "commit" step)
+## Run & Verify
 
-1. One member creates a public GitHub repo and adds the other three as collaborators.
-2. Everyone clones it. Copy this folder's contents into the clone, including the hidden `.dvc/`, `.dvcignore` and `.gitignore`.
-3. Then run:
-
-```bash
-git add .
-git status        # train.csv and later.csv must NOT be listed; their .dvc files must be
-git commit -m "Stage 1: repo layout, DVC tracking, seven data checks, findings data part"
-git push
-```
-
-Each member should commit their own part from their own GitHub account. The marking tool counts commits per person.
-
-## Run it
-
-Use Python 3.12 or newer.
+Use Python 3.12 or newer:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# The CSVs are not in git. Copy the ORIGINAL train.csv and later.csv from the
-# problem zip into data/raw/ (never open and save them in Excel).
-dvc status                          # "up to date" = your files match the .dvc hashes
+# Run the test suite (works without raw train/later CSVs)
+python -m pytest -v
 
-# Hunt the seven data problems and write them into reports/findings.yaml
-PYTHONPATH=src python -m mp124.find_issues
-# print only, don't touch the file:
+# Run Stage 4 artifact & findings audit
+PYTHONPATH=src python -m mp124.verify
+
+# Start the FastAPI prediction service locally
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Data Checks, Training & Monitoring (requires original `train.csv` and `later.csv` in `data/raw/`)
+
+```bash
+dvc status
 PYTHONPATH=src python -m mp124.find_issues --dry-run
+PYTHONPATH=src python -m mp124.train --output-dir .venv/mp124-reproduction
+PYTHONPATH=src python -m mp124.monitor
 ```
 
-On Windows PowerShell, use `$env:PYTHONPATH="src"; python -m mp124.find_issues`.
+### Container & Kubernetes
 
-## Reproduce the MLflow runs
-
-After copying the original CSVs into `data/raw/`, run from the repository root:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m mp124.train --output-dir .venv/mp124-reproduction
+```bash
+docker build -t mp124-api:1.0 .
+docker run --rm -p 8000:8000 mp124-api:1.0
+kubectl apply -f k8s/
 ```
 
-Use a fresh output directory for each reproduction. The command creates a new tracking
-database, logs the SHA-256 of the original `train.csv` in every run, and prints
-the tracking fields and promotion decision for the findings report.
+## Stage 1 & Stage 4 Summary
 
-The last 20% of the deduplicated training rows by date select the v1 settings.
-The winning settings are refit on all deduplicated training rows. v2 adds the
-first 70% of `later.csv` by date and receives the `champion` alias only if
-its MAE on the remaining 30% improves by at least 10%.
-
-Open the committed experiment from the repository root with
-`mlflow ui --backend-store-uri sqlite:///mlflow.db`. The registered model is
-`mp124-grain-regressor`. The artifact paths are relative to the directory
-that contains the tracking database, so start MLflow from that directory.
-
-## Stage 1 results (train.csv as given, 1038 rows)
-
-train.csv SHA-256: `1f6f6cad6e2959cb7840d884728b614aa1360d629ec8c41a8330985ef8f1ffb3`
-
-| Problem | Present | Details |
-|---|---|---|
-| leaking_column | no | holdout has every feature column; no feature has a correlation with `grain_kg` above 0.68 |
-| unit_mixup | no | every column has nearly the same mean in all three blocks (largest gap 7%) |
-| sentinel_value | **yes** | `biometric_failures` = 9999 on 44 rows (the real values are 0-80) |
-| duplicate_rows | **yes** | 38 extra copies |
-| stuck_sensor | no | the longest repeated-value run lasts 2 days |
-| target_typos | no | max `grain_kg` is 2022.3, only 1.8x the median; no gap |
-| spelling_variants | **yes** | `shop_area` has 18 spellings that clean up to 3 levels (rural, tribal, urban) |
+- `train.csv` SHA-256: `1f6f6cad6e2959cb7840d884728b614aa1360d629ec8c41a8330985ef8f1ffb3`
+- **Data issues found:** `sentinel_value` (`biometric_failures = 9999` on 44 rows), `duplicate_rows` (38 extra copies), `spelling_variants` (`shop_area` -> 3 levels: `rural`, `tribal`, `urban`).
+- **Drift & group MAE (v1 on `later.csv`):** most drifted numeric feature `cards_attached` (`PSI = 5.496764`); worst-served group `Block South` (`MAE = 557.140678` kg).
+- **Retraining & promotion (last 30% of `later.csv`):** v1 MAE `167.7568` kg -> v2 MAE `120.9564` kg (`promote`, `@champion` = version 2).

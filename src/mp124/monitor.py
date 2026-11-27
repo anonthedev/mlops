@@ -1,10 +1,7 @@
 """Compute PSI drift and per-group MAE for MP124 monitoring (PROBLEM.md section 7)."""
 
 import argparse
-from pathlib import Path
 
-import mlflow
-import mlflow.sklearn
 import numpy as np
 import pandas as pd
 import yaml
@@ -33,6 +30,8 @@ def compute_psi(expected: pd.Series, actual: pd.Series, bins: int = 10) -> float
     """Compute 10-bin Population Stability Index using quantile edges from expected."""
     exp = expected.dropna().to_numpy()
     act = actual.dropna().to_numpy()
+    if len(exp) == 0 or len(act) == 0:
+        raise ValueError("Expected and actual series must each contain at least one non-null value.")
 
     quantiles = np.linspace(0, 100, bins + 1)
     edges = np.unique(np.percentile(exp, quantiles))
@@ -49,7 +48,57 @@ def compute_psi(expected: pd.Series, actual: pd.Series, bins: int = 10) -> float
     return float(np.sum((act_pct - exp_pct) * np.log(act_pct / exp_pct)))
 
 
+def compute_all_psi(
+    reference: pd.DataFrame,
+    current: pd.DataFrame,
+    numeric_cols: list[str],
+    bins: int = 10,
+) -> dict[str, float]:
+    """Compute rounded PSI scores for every numeric column."""
+    return {col: round(compute_psi(reference[col], current[col], bins=bins), 6) for col in numeric_cols}
+
+
+def compute_group_mae(
+    frame: pd.DataFrame,
+    target_col: str,
+    pred_col: str,
+    group_col: str = "block",
+    groups: tuple[str, ...] = ("Block North", "Block South", "Block East"),
+) -> dict[str, float]:
+    """Compute rounded MAE separately for each group value present in frame."""
+    ordered_groups = groups or tuple(sorted(frame[group_col].dropna().unique()))
+    mae_by_group: dict[str, float] = {}
+    for group_name in ordered_groups:
+        subset = frame[frame[group_col] == group_name]
+        if not subset.empty:
+            mae_by_group[group_name] = round(
+                float(mean_absolute_error(subset[target_col], subset[pred_col])), 6
+            )
+    return mae_by_group
+
+
+def should_promote(mae_v1: float, mae_v2: float, min_reduction: float = 0.10) -> bool:
+    """Return True when v2 lowers MAE by at least min_reduction relative to v1."""
+    return mae_v1 > 0 and mae_v2 <= mae_v1 * (1.0 - min_reduction)
+
+
+def split_later_chronologically(
+    later: pd.DataFrame,
+    date_col: str,
+    fit_fraction: float = 0.70,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Sort later data by date and split into retraining fit and check slices."""
+    ordered = later.sort_values(date_col, kind="stable")
+    cutoff = int(len(ordered) * fit_fraction)
+    if cutoff <= 0 or cutoff >= len(ordered):
+        raise ValueError("Chronological split must leave rows on both sides of the cutoff.")
+    return ordered.iloc[:cutoff], ordered.iloc[cutoff:]
+
+
 def main():
+    import mlflow
+    import mlflow.sklearn
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--update-findings",
@@ -68,7 +117,7 @@ def main():
     later = clean_frame(load_csv("later", params))
 
     # 1. PSI per numeric feature
-    psi_scores = {col: round(compute_psi(train[col], later[col], bins=10), 6) for col in numeric_cols}
+    psi_scores = compute_all_psi(train, later, numeric_cols, bins=10)
     most_drifted = max(psi_scores, key=psi_scores.get)
 
     # 2. Load v1 from MLflow registry and compute MAE per block on later.csv
@@ -80,11 +129,7 @@ def main():
     later_preds = v1_model.predict(later[feature_cols])
     later_eval = later.assign(_pred=later_preds)
 
-    mae_by_group = {}
-    for block_name in ("Block North", "Block South", "Block East"):
-        subset = later_eval[later_eval["block"] == block_name]
-        mae_by_group[block_name] = round(float(mean_absolute_error(subset[target], subset["_pred"])), 6)
-
+    mae_by_group = compute_group_mae(later_eval, target, "_pred", group_col=columns["group"])
     worst_group = max(mae_by_group, key=mae_by_group.get)
 
     summary = {
